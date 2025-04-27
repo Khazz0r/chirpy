@@ -1,9 +1,10 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"sync/atomic"
-	"fmt"
 )
 
 type apiConfig struct {
@@ -16,15 +17,16 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
 	mux.Handle("/assets", http.FileServer(http.Dir("logo.png")))
-	
+
 	mux.HandleFunc("GET /api/healthz", handlerOkStatus)
+	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
 
 	mux.HandleFunc("POST /admin/reset", apiCfg.handlerResetNumOfRequests)
 	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerNumOfRequests)
 
 	server := http.Server{
 		Handler: mux,
-		Addr: ":8080",
+		Addr:    ":8080",
 	}
 
 	server.ListenAndServe()
@@ -76,4 +78,27 @@ func (cfg *apiConfig) handlerResetNumOfRequests(w http.ResponseWriter, req *http
 	cfg.fileserverHits.Store(0)
 
 	w.Write([]byte("Hits have been reset"))
+}
+
+// handler to ensure Chirps are valid under the rules when /validate_chirp is accessed
+func handlerValidateChirp(w http.ResponseWriter, req *http.Request) {
+	type parameters struct {
+		Body string `json:"body"`
+	}
+
+	decoder := json.NewDecoder(req.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
+		return
+	}
+
+	const maxChirpLength = 140
+	if len(params.Body) > maxChirpLength {
+		respondWithError(w, http.StatusBadRequest, "Chirp is too long", nil)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, badWordReplacer(params.Body))
 }
