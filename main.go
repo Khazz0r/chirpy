@@ -16,9 +16,11 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
 	mux.Handle("/assets", http.FileServer(http.Dir("logo.png")))
-	mux.HandleFunc("GET /healthz", handlerOkStatus)
-	mux.HandleFunc("GET /metrics", apiCfg.handlerNumOfRequests)
-	mux.HandleFunc("POST /reset", apiCfg.handlerResetNumOfRequests)
+	
+	mux.HandleFunc("GET /api/healthz", handlerOkStatus)
+
+	mux.HandleFunc("POST /admin/reset", apiCfg.handlerResetNumOfRequests)
+	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerNumOfRequests)
 
 	server := http.Server{
 		Handler: mux,
@@ -48,11 +50,20 @@ func handlerOkStatus(w http.ResponseWriter, req *http.Request) {
 
 // handler to write out the number of hits that have happened with when /metrics is accessed
 func (cfg *apiConfig) handlerNumOfRequests(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 
 	hits := cfg.fileserverHits.Load()
-	message := fmt.Sprintf("Hits: %d", hits)
+	message := fmt.Sprintf(`
+<html>
+
+<body>
+	<h1>Welcome, Chirpy Admin</h1>
+	<p>Chirpy has been visited %d times!</p>
+</body>
+
+</html>
+`, hits)
 
 	w.Write([]byte(message))
 }
