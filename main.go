@@ -1,18 +1,50 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
+	"database/sql"
+	"log"
 	"net/http"
+	"os"
 	"sync/atomic"
+
+	"github.com/Khazz0r/chirpy/internal/database"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
+	Queries *database.Queries
+	platform string
 }
 
 func main() {
-	var apiCfg apiConfig
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatalf("error loading environment variables: %v", err)
+	}
+
+	dbURL:= os.Getenv("DB_URL")
+	if dbURL == "" {
+		log.Fatal("DB_URL must be set")
+	}
+	platform := os.Getenv("PLATFORM")
+	if platform == "" {
+		log.Fatal("PLATFORM must be set")
+	}
+
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Fatalf("error opening chirpy database: %v", err)
+	}
+
+	dbQueries := database.New(db)
+
+	apiCfg := apiConfig{
+		fileserverHits: atomic.Int32{},
+		Queries: dbQueries,
+		platform: platform,
+	}
 
 	mux := http.NewServeMux()
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
@@ -20,8 +52,9 @@ func main() {
 
 	mux.HandleFunc("GET /api/healthz", handlerOkStatus)
 	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
+	mux.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
 
-	mux.HandleFunc("POST /admin/reset", apiCfg.handlerResetNumOfRequests)
+	mux.HandleFunc("POST /admin/reset", apiCfg.handlerDeleteAllUsers)
 	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerNumOfRequests)
 
 	server := http.Server{
@@ -30,75 +63,4 @@ func main() {
 	}
 
 	server.ListenAndServe()
-}
-
-// middleware to track how many times the website has been accessed
-func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		cfg.fileserverHits.Add(1)
-		next.ServeHTTP(w, req)
-	})
-}
-
-// handler to show an ok status when /healthz is accessed
-func handlerOkStatus(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-
-	message := "OK"
-
-	w.Write([]byte(message))
-}
-
-// handler to write out the number of hits that have happened with when /metrics is accessed
-func (cfg *apiConfig) handlerNumOfRequests(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-
-	hits := cfg.fileserverHits.Load()
-	message := fmt.Sprintf(`
-<html>
-
-<body>
-	<h1>Welcome, Chirpy Admin</h1>
-	<p>Chirpy has been visited %d times!</p>
-</body>
-
-</html>
-`, hits)
-
-	w.Write([]byte(message))
-}
-
-// handler to reset number of hits back to 0 when /reset is accessed
-func (cfg *apiConfig) handlerResetNumOfRequests(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-
-	cfg.fileserverHits.Store(0)
-
-	w.Write([]byte("Hits have been reset"))
-}
-
-// handler to ensure Chirps are valid under the rules when /validate_chirp is accessed
-func handlerValidateChirp(w http.ResponseWriter, req *http.Request) {
-	type parameters struct {
-		Body string `json:"body"`
-	}
-
-	decoder := json.NewDecoder(req.Body)
-	params := parameters{}
-	err := decoder.Decode(&params)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
-		return
-	}
-
-	const maxChirpLength = 140
-	if len(params.Body) > maxChirpLength {
-		respondWithError(w, http.StatusBadRequest, "Chirp is too long", nil)
-		return
-	}
-
-	respondWithJSON(w, http.StatusOK, badWordReplacer(params.Body))
 }
