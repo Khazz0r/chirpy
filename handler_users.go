@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Khazz0r/chirpy/internal/auth"
+	"github.com/Khazz0r/chirpy/internal/database"
 	"github.com/google/uuid"
 )
 
@@ -19,6 +21,7 @@ type User struct {
 func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, req *http.Request) {
 	type parameters struct {
 		Email string `json:"email"`
+		Password string `json:"password"`
 	}
 	type response struct {
 		User
@@ -32,7 +35,16 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, req *http.Request
 		return
 	}
 
-	user, err := cfg.db.CreateUser(req.Context(), params.Email)
+	hashedPassword, err := auth.HashPassword(params.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error hashing password", err)
+		return
+	}
+
+	user, err := cfg.db.CreateUser(req.Context(), database.CreateUserParams{
+		Email: params.Email,
+		HashedPassword: string(hashedPassword),
+	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Issue creating user in database", err)
 		return
@@ -60,4 +72,43 @@ func (cfg *apiConfig) handlerDeleteAllUsers(w http.ResponseWriter, req *http.Req
 	cfg.db.DeleteUsers(req.Context())
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Hits reset to 0 and database reset to initial state"))
+}
+
+// handler that will log in the user as long as email exists in database and passwords match
+func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
+	type parameters struct {
+		Email string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	type response struct {
+		User
+	}
+
+	decoder := json.NewDecoder(req.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error decoding request", err)
+		return
+	}
+
+	user, err := cfg.db.GetUserByEmail(req.Context(), params.Email)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "The email provided does not exist", err)
+	}
+
+	err = auth.CheckPasswordHash(user.HashedPassword, params.Password)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Cannot login, wrong password provided", err)
+	}
+
+	respondWithJSON(w, http.StatusOK, response{
+		User{
+			ID: user.ID,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+			Email: user.Email,
+		},
+	})
 }
