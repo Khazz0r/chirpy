@@ -14,8 +14,8 @@ import (
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
-	Queries *database.Queries
-	platform string
+	db        *database.Queries
+	platform       string
 }
 
 func main() {
@@ -24,7 +24,7 @@ func main() {
 		log.Fatalf("error loading environment variables: %v", err)
 	}
 
-	dbURL:= os.Getenv("DB_URL")
+	dbURL := os.Getenv("DB_URL")
 	if dbURL == "" {
 		log.Fatal("DB_URL must be set")
 	}
@@ -42,8 +42,8 @@ func main() {
 
 	apiCfg := apiConfig{
 		fileserverHits: atomic.Int32{},
-		Queries: dbQueries,
-		platform: platform,
+		db:        dbQueries,
+		platform:       platform,
 	}
 
 	mux := http.NewServeMux()
@@ -51,8 +51,8 @@ func main() {
 	mux.Handle("/assets", http.FileServer(http.Dir("logo.png")))
 
 	mux.HandleFunc("GET /api/healthz", handlerOkStatus)
-	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
 	mux.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
+	mux.HandleFunc("POST /api/chirps", apiCfg.handlerCreateChirp)
 
 	mux.HandleFunc("POST /admin/reset", apiCfg.handlerDeleteAllUsers)
 	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerNumOfRequests)

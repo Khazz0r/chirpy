@@ -9,11 +9,13 @@ import (
 	"github.com/google/uuid"
 )
 
+var UserID uuid.UUID
+
 type User struct {
-	ID uuid.UUID `json:"id"`
+	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-	Email string `json:"email"`
+	Email     string    `json:"email"`
 }
 
 // handler that creates a user to the chirpy database with the provided email payload
@@ -32,17 +34,17 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, req *http.Request
 		respondWithError(w, http.StatusInternalServerError, "Error decoding request", err)
 	}
 
-	user, err := cfg.Queries.CreateUser(context.Background(), params.Email)
+	user, err := cfg.db.CreateUser(context.Background(), params.Email)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Issue creating user in database", err)
 	}
-	
+
 	respondWithJSON(w, http.StatusCreated, response{
 		User: User{
-			ID: user.ID,
+			ID:        user.ID,
 			CreatedAt: user.CreatedAt,
 			UpdatedAt: user.UpdatedAt,
-			Email: user.Email,
+			Email:     user.Email,
 		},
 	})
 }
@@ -56,30 +58,7 @@ func (cfg *apiConfig) handlerDeleteAllUsers(w http.ResponseWriter, req *http.Req
 	}
 
 	cfg.fileserverHits.Store(0)
-	cfg.Queries.DeleteUsers(context.Background())
+	cfg.db.DeleteUsers(context.Background())
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Hits reset to 0 and database reset to initial state"))
-}
-
-// handler to ensure Chirps are valid under the rules when /validate_chirp is accessed
-func handlerValidateChirp(w http.ResponseWriter, req *http.Request) {
-	type parameters struct {
-		Body string `json:"body"`
-	}
-
-	decoder := json.NewDecoder(req.Body)
-	params := parameters{}
-	err := decoder.Decode(&params)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
-		return
-	}
-
-	const maxChirpLength = 140
-	if len(params.Body) > maxChirpLength {
-		respondWithError(w, http.StatusBadRequest, "Chirp is too long", nil)
-		return
-	}
-
-	respondWithJSON(w, http.StatusOK, badWordReplacer(params.Body))
 }
