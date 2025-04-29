@@ -1,15 +1,12 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 )
-
-var UserID uuid.UUID
 
 type User struct {
 	ID        uuid.UUID `json:"id"`
@@ -32,11 +29,13 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, req *http.Request
 	err := decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Error decoding request", err)
+		return
 	}
 
-	user, err := cfg.db.CreateUser(context.Background(), params.Email)
+	user, err := cfg.db.CreateUser(req.Context(), params.Email)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Issue creating user in database", err)
+		return
 	}
 
 	respondWithJSON(w, http.StatusCreated, response{
@@ -58,7 +57,7 @@ func (cfg *apiConfig) handlerDeleteAllUsers(w http.ResponseWriter, req *http.Req
 	}
 
 	cfg.fileserverHits.Store(0)
-	cfg.db.DeleteUsers(context.Background())
+	cfg.db.DeleteUsers(req.Context())
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Hits reset to 0 and database reset to initial state"))
 }
