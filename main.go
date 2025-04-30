@@ -14,8 +14,9 @@ import (
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
-	db        *database.Queries
+	db             *database.Queries
 	platform       string
+	jwtSecret      string
 }
 
 func main() {
@@ -32,6 +33,10 @@ func main() {
 	if platform == "" {
 		log.Fatal("PLATFORM must be set")
 	}
+	jwtSecret := os.Getenv("JWTSECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT secret must be set")
+	}
 
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
@@ -42,8 +47,9 @@ func main() {
 
 	apiCfg := apiConfig{
 		fileserverHits: atomic.Int32{},
-		db:        dbQueries,
+		db:             dbQueries,
 		platform:       platform,
+		jwtSecret:      jwtSecret,
 	}
 
 	mux := http.NewServeMux()
@@ -51,6 +57,9 @@ func main() {
 	mux.Handle("/assets", http.FileServer(http.Dir("logo.png")))
 
 	mux.HandleFunc("GET /api/healthz", handlerOkStatus)
+
+	mux.HandleFunc("POST /api/refresh", apiCfg.handlerRefreshToken)
+	mux.HandleFunc("POST /api/revoke", apiCfg.handlerRevokeToken)
 
 	mux.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
 	mux.HandleFunc("POST /api/login", apiCfg.handlerLogin)

@@ -11,16 +11,18 @@ import (
 )
 
 type User struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
+	ID           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Email        string    `json:"email"`
+	Token        string    `json:"token"`
+	RefreshToken string    `json:"refresh_token"`
 }
 
 // handler that creates a user to the chirpy database with the provided email payload
 func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, req *http.Request) {
 	type parameters struct {
-		Email string `json:"email"`
+		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
 	type response struct {
@@ -42,7 +44,7 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, req *http.Request
 	}
 
 	user, err := cfg.db.CreateUser(req.Context(), database.CreateUserParams{
-		Email: params.Email,
+		Email:          params.Email,
 		HashedPassword: string(hashedPassword),
 	})
 	if err != nil {
@@ -77,8 +79,8 @@ func (cfg *apiConfig) handlerDeleteAllUsers(w http.ResponseWriter, req *http.Req
 // handler that will log in the user as long as email exists in database and passwords match
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 	type parameters struct {
-		Email string `json:"email"`
-		Password string `json:"password"`
+		Email            string `json:"email"`
+		Password         string `json:"password"`
 	}
 
 	type response struct {
@@ -96,19 +98,44 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 	user, err := cfg.db.GetUserByEmail(req.Context(), params.Email)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "The email provided does not exist", err)
+		return
 	}
 
 	err = auth.CheckPasswordHash(user.HashedPassword, params.Password)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Cannot login, wrong password provided", err)
+		return
+	}
+
+	jwtTokenStr, err := auth.MakeJWTToken(user.ID, cfg.jwtSecret, time.Hour)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not make JWT token", err)
+		return
+	}
+
+	refreshToken, err := auth.MakeRefreshToken()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not make refresh token", err)
+		return
+	}
+
+	err = cfg.db.CreateRefreshToken(req.Context(), database.CreateRefreshTokenParams{
+		Token: refreshToken,
+		UserID: user.ID,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not set refresh token into database", err)
+		return
 	}
 
 	respondWithJSON(w, http.StatusOK, response{
 		User{
-			ID: user.ID,
+			ID:        user.ID,
 			CreatedAt: user.CreatedAt,
 			UpdatedAt: user.UpdatedAt,
-			Email: user.Email,
+			Email:     user.Email,
+			Token:     jwtTokenStr,
+			RefreshToken: refreshToken,
 		},
 	})
 }
