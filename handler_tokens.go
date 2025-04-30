@@ -19,7 +19,7 @@ func (cfg *apiConfig) handlerRefreshToken(w http.ResponseWriter, req *http.Reque
 
 	token, err := auth.GetBearerToken(req.Header)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Unable to get bearer token from Authorization header", err)
+		respondWithError(w, http.StatusUnauthorized, "Unable to get bearer token from Authorization header", err)
 		return
 	}
 
@@ -50,7 +50,7 @@ func (cfg *apiConfig) handlerRefreshToken(w http.ResponseWriter, req *http.Reque
 func (cfg *apiConfig) handlerRevokeToken(w http.ResponseWriter, req *http.Request) {
 	token, err := auth.GetBearerToken(req.Header)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Unable to get bearer token from Authorization header", err)
+		respondWithError(w, http.StatusUnauthorized, "Unable to get bearer token from Authorization header", err)
 		return
 	}
 

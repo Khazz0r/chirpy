@@ -6,12 +6,13 @@ import (
 )
 
 func MakeRefreshToken() (string, error) {
-	randomData, err := rand.Read(make([]byte, 32))
+	token := make([]byte, 32)
+	_, err := rand.Read(token)
 	if err != nil {
 		return "", err
 	}
 
-	encodedData := hex.EncodeToString(make([]byte, randomData))
+	encodedData := hex.EncodeToString(token)
 
 	return encodedData, nil
 }

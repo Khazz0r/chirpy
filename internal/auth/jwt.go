@@ -27,12 +27,9 @@ func MakeJWTToken(userID uuid.UUID, tokenSecret string, expiresIn time.Duration)
 }
 
 func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
-	claims := &jwt.RegisteredClaims{}
+	claims := jwt.RegisteredClaims{}
 
-	jwtToken, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
-		}
+	jwtToken, err := jwt.ParseWithClaims(tokenString, &claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(tokenSecret), nil
 	})
 	if err != nil {
@@ -48,6 +45,14 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 		return uuid.Nil, err
 	}
 
+	issuer, err := jwtToken.Claims.GetIssuer()
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if issuer != "chirpy" {
+		return uuid.Nil, errors.New("invalid issuer")
+	}
+
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		return uuid.Nil, err
@@ -61,6 +66,6 @@ func GetBearerToken(headers http.Header) (string, error) {
 	if len(authParts) != 2 || strings.ToLower(authParts[0]) != "bearer" {
 		return "", errors.New("invalid or missing Authorization header")
 	}
-	
+
 	return authParts[1], nil
 }

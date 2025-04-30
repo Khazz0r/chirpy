@@ -33,11 +33,11 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, req *http.Reques
 	// obtain token for verifying if user is authorized
 	token, err := auth.GetBearerToken(req.Header)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Unable to get bearer token from Authorization header", err)
+		respondWithError(w, http.StatusUnauthorized, "Unable to get bearer token from Authorization header", err)
 		return
 	}
 
-	// validate to ensure an access token is used
+	// validate to ensure an access token matches
 	userID, err := auth.ValidateJWT(token, cfg.jwtSecret)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Not authorized to create a chirp", err)
@@ -158,4 +158,48 @@ func (cfg *apiConfig) handlerGetChirp(w http.ResponseWriter, req *http.Request) 
 			UserID:    chirp.UserID,
 		},
 	})
+}
+
+// handler that deletes a chirp as long as the user is authorized
+func (cfg *apiConfig) handlerDeleteChirp(w http.ResponseWriter, req *http.Request) {
+	chirpIDStr := req.PathValue("chirpID")
+	chirpID, err := uuid.Parse(chirpIDStr)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid Chirp ID format", err)
+		return
+	}
+
+	// obtain token for verifying if user is authorized
+	token, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unable to get bearer token from Authorization header", err)
+		return
+	}
+
+	// validate to ensure an access token matches
+	userID, err := auth.ValidateJWT(token, cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w, http.StatusForbidden, "Not authorized to create a chirp", err)
+		return
+	}
+
+	chirp, err := cfg.db.GetChirpByID(req.Context(), chirpID)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Chirp not found", err)
+		return
+	}
+	if userID != chirp.UserID {
+		respondWithError(w, http.StatusForbidden, "Not author of chirp, can't delete", err)
+	}
+
+	err = cfg.db.DeleteChirp(req.Context(), database.DeleteChirpParams{
+		ID:     chirp.ID,
+		UserID: userID,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Could not find chirp by ID provided", err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
