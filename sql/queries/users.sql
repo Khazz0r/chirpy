@@ -20,3 +20,9 @@ WHERE users.email = $1;
 UPDATE users
 SET email = $1, hashed_password = $2
 WHERE id = $3;
+
+-- name: UpgradeUser :one
+UPDATE users
+SET is_chirpy_red = true
+WHERe id = $1
+RETURNING *;
