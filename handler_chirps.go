@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -110,10 +111,54 @@ func badWordReplacer(body string) string {
 
 // handler that gets all Chirps if requested
 func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, req *http.Request) {
-	chirps, err := cfg.db.GetAllChirps(req.Context())
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error retrieving all chirps from database", err)
-		return
+	var (
+		chirps []database.Chirp
+		err    error
+		userID uuid.UUID
+	)
+
+	authorID := req.URL.Query().Get("author_id")
+	sortType := req.URL.Query().Get("sort")
+
+	if authorID == "" {
+		chirps, err = cfg.db.GetAllChirps(req.Context())
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Error retrieving all chirps from database", err)
+			return
+		}
+	} else {
+		userID, err = uuid.Parse(authorID)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Unable to parse author ID", err)
+			return
+		}
+
+		chirps, err = cfg.db.GetChirpsByAuthorID(req.Context(), userID)
+		if err != nil {
+			respondWithError(w, http.StatusNotFound, "Unable to find chirpys by that author ID", err)
+			return
+		}
+	}
+
+	if sortType == "desc" {
+		slices.SortFunc(chirps, func(chirp1, chirp2 database.Chirp) int {
+			if chirp1.CreatedAt.After(chirp2.CreatedAt) {
+				return -1
+			} else if chirp1.CreatedAt.Before(chirp2.CreatedAt) {
+				return 1
+			}
+			return 0
+		})
+	} else {
+		// by default, sort in ascending order if desc is not specified
+		slices.SortFunc(chirps, func(chirp1, chirp2 database.Chirp) int {
+			if chirp1.CreatedAt.Before(chirp2.CreatedAt) {
+				return -1
+			} else if chirp1.CreatedAt.After(chirp2.CreatedAt) {
+				return 1
+			}
+			return 0
+		})
 	}
 
 	structuredChirps := []Chirp{}
