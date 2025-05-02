@@ -17,6 +17,7 @@ Since this is a RESTful API it'll follow standard conventions with GET, POST, PU
 
 ### User endpoints
 1. POST /api/users
+
 **Give**
 ```
 {
@@ -36,6 +37,7 @@ Since this is a RESTful API it'll follow standard conventions with GET, POST, PU
 ```
 
 2. POST /api/login
+
 **Give**
 ```
 {
@@ -57,6 +59,7 @@ Since this is a RESTful API it'll follow standard conventions with GET, POST, PU
 ```
 
 3. PUT /api/users
+
 **Give**
 *Headers:*
 Authorization: Bearer ${AccessToken}
@@ -76,6 +79,7 @@ Authorization: Bearer ${AccessToken}
 ### Chirp Endpoints
 1. POST /api/chirps
 Authorization: Bearer ${AccessToken}
+
 **Give**
 ```
 {
@@ -94,6 +98,7 @@ Authorization: Bearer ${AccessToken}
 ```
 
 2. GET /api/chirps
+
 **Give**
 *Can query by author_id and sort, defaults to ascending order by created_at eg. GET /api/chirps?sort=desc*
 **Receive**
@@ -110,6 +115,7 @@ Authorization: Bearer ${AccessToken}
 ```
 
 3. GET /api/chirps/{chirpID}
+
 **Give**
 *Can query by chirpID to get a specific Chirp by its ID*
 **Receive**
@@ -124,6 +130,7 @@ Authorization: Bearer ${AccessToken}
 ```
 
 4. DELETE /api/chirps/{chirpID}
+
 **Give**
 Authorization: Bearer ${AccessToken}
 *Can query by chirpIP to delete the specified Chirp*
