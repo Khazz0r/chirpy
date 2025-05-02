@@ -62,7 +62,6 @@ Since this is a RESTful API it'll follow standard conventions with GET, POST, PU
 
 **Give**
 
-*Headers:*
 Authorization: Bearer ${AccessToken}
 ```
 {
@@ -79,6 +78,7 @@ Authorization: Bearer ${AccessToken}
 
 ### Chirp Endpoints
 1. POST /api/chirps
+
 Authorization: Bearer ${AccessToken}
 
 **Give**
@@ -139,13 +139,14 @@ Authorization: Bearer ${AccessToken}
 **Give**
 
 Authorization: Bearer ${AccessToken}
+
 *Can query by chirpIP to delete the specified Chirp*
 
 **Receive**
 Just a 204 status code
 
 ### Admin Endpoints
-There are also "POST /admin/reset" and "GET /admin/metrics" endpoints with one deleting everything in the database for a clean slate and the other returning how many hits the API has gotten respectively, they're pretty self explanator, just call them and it should work, since this is all local there's not much security to these.
+There are also "POST /admin/reset" and "GET /admin/metrics" endpoints with one deleting everything in the database for a clean slate and the other returning how many hits the API has gotten respectively, they're pretty self explanatory, just call them and it should work, since this is all local there's not much security to these.
 
 ## Conclusion
 As you can see, this is a pretty simple API, I learned a ton from doing this and I hope you enjoy playing around with it. Feel free to contribute by forking the repo and opening pull requests, all pull requests should be submitted to the main branch.
